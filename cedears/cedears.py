@@ -2,7 +2,7 @@
 #
 # Copyright Juanjo Ciarlante <http://twitter.com/xjjo>
 #
-# License: GPLv3
+# License: MIT
 #
 import argparse
 import sys
