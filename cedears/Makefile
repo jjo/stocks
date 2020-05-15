@@ -15,6 +15,7 @@ run:
 test:
 	nose2-3 -C
 
+# DANGER: this was a one-time save, needs beter any-moment-sample instrumentation
 testdata-refresh:
 	$(CURL) -so testdata/CEDEARS-SHARES.html https://www.comafi.com.ar/2254-CEADEAR-SHARES.note.aspx
 	$(CURL) -sko testdata/CEDEARS-quotes.json 'https://www.byma.com.ar/wp-admin/admin-ajax.php?action=get_panel&panel_id=5'
@@ -22,7 +23,7 @@ testdata-refresh:
 	$(CURL) -so testdata/yfin-PBR.json https://query1.finance.yahoo.com/v10/finance/quoteSummary/PBR?modules=financialData
 	$(CURL) -so testdata/yfin-XOM.json https://query1.finance.yahoo.com/v10/finance/quoteSummary/XOM?modules=financialData
 	$(CURL) -so testdata/zacks-PBR.html https://www.zacks.com/stock/quote/PBR
-	curl -o testdata/zacks-BBD.html https://www.zacks.com/stock/quote/BBD
-	curl -o testdata/zacks-XOM.html https://www.zacks.com/stock/quote/XOM
+	$(CURL) -so testdata/zacks-BBD.html https://www.zacks.com/stock/quote/BBD
+	$(CURL) -so testdata/zacks-XOM.html https://www.zacks.com/stock/quote/XOM
 
 .PHONY: all build push run test testdata-refres
