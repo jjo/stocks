@@ -67,7 +67,7 @@ def get_byma(ratios):
     # WTF CEDEARS_LIVE_URL doesn't have a proper TLS cert(?)
     r = url_get(CEDEARS_LIVE_URL, params=CEDEARS_LIVE_PARAMS, verify=False, timeout=30)
     # Parse JSON into DF
-    df = pd.DataFrame(columns=['Ticker', 'ARS_value', 'Ratio', 'ARS_Volume', 'US_Ticker'])
+    df = pd.DataFrame(columns=['Ticker', 'ARS_value', 'Ratio', 'ARS_Volume', 'ARS_OrdBuy', 'ARS_OrdSel', 'US_Ticker'])
     for x in r.json()["Cotizaciones"]:
         # - skip tickers w/o value
         # - only delayed quotes, for better volume
@@ -76,7 +76,6 @@ def get_byma(ratios):
         if (
             x['Ultimo'] == 0 or
             x['Vencimiento'] not in ("48hs", "24hs") or
-            x['Volumen_Nominal'] == 0 or
             x['Tipo_Liquidacion'] != "Pesos"
         ):
             continue
@@ -84,6 +83,8 @@ def get_byma(ratios):
         ars_value = x['Ultimo']
         period = x['Vencimiento']
         volume = x['Volumen_Nominal']
+        ars_buy = x['Cantidad_Nominal_Compra']
+        ars_sell = x['Cantidad_Nominal_Venta']
         #logger.info('ticker={} ars_value={}'.format(ticker, ars_value))
         try:
             ratio = ratios.loc[ticker, 'Ratio']
@@ -96,6 +97,8 @@ def get_byma(ratios):
             'ARS_value': ars_value,
             'Ratio': ratio,
             'ARS_Volume': volume,
+            'ARS_OrdBuy': ars_buy,
+            'ARS_OrdSel': ars_sell,
             'ARS_Period': period,
         }, ignore_index=True)
     # Index the DF by ticker
@@ -190,13 +193,13 @@ async def fetch(df):
             df.drop(stock, inplace=True)
             continue
 
-        price_ars = df.loc[stock, 'ARS_value']
+        price_ars = df_loc1(df, stock, 'ARS_value')
         ratio = df.loc[stock, 'Ratio']
         ccl_val = get_ccl_val(price_ars, price, ratio)
         # Add (column and) cell with computed values
         df.loc[stock, 'ZRank'] = rank
         df.loc[stock, 'CCL_val'] = ccl_val
-        df.loc[stock, 'ARS_tot'] = price_ars * ratio
+        df.loc[stock, 'ARS_tot'] = int(price_ars * ratio)
         df.loc[stock, 'USD_val'] = price
 
     # Use quantile 0.5 as ref value
@@ -214,10 +217,17 @@ def get_main_df(args):
     byma_all = get_byma(ratios)
 
     # Choose only stocks with ARS_value > 0 and volume over vol_quantile
-    df = byma_all[
-        (byma_all.ARS_value > 0) &
-        (byma_all.ARS_Volume >= byma_all.ARS_Volume.quantile(args.vol_quantile))
-    ]
+    if args.no_filter:
+        df = byma_all
+    else:
+        df = byma_all[
+            (byma_all.ARS_value > 0) &
+            (
+                (byma_all.ARS_Volume >= byma_all.ARS_Volume.quantile(args.vol_quantile)) |
+                (byma_all.ARS_OrdBuy >= byma_all.ARS_OrdBuy.quantile(args.vol_quantile)) |
+                (byma_all.ARS_OrdSel >= byma_all.ARS_OrdSel.quantile(args.vol_quantile))
+            )
+        ]
     df.sort_index(inplace=True)
     if len(df) == 0:
         logger.fatal("NO stocks grabbed")
@@ -240,6 +250,7 @@ def parseargs():
     parser = argparse.ArgumentParser(description="CEDEARS CCL tool by jjo")
     parser.add_argument('vol_quantile', type=float, nargs='?',
                         default = VOLUME_QUANTILE)
+    parser.add_argument('--no-filter', action="store_true")
     return parser.parse_args()
 
 def main():
