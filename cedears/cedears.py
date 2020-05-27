@@ -99,7 +99,7 @@ def get_byma(ratios):
             'ARS_Volume': volume,
             'ARS_OrdBuy': ars_buy,
             'ARS_OrdSel': ars_sell,
-            'ARS_Period': period,
+            'ARS_period': period,
         }, ignore_index=True)
     # Index the DF by ticker
     df = df.set_index("Ticker")
@@ -194,7 +194,7 @@ async def fetch(df):
             continue
 
         price_ars = df_loc1(df, stock, 'ARS_value')
-        ratio = df.loc[stock, 'Ratio']
+        ratio = df_loc1(df, stock, 'Ratio')
         ccl_val = get_ccl_val(price_ars, price, ratio)
         # Add (column and) cell with computed values
         df.loc[stock, 'ZRank'] = rank
