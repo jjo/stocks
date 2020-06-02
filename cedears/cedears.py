@@ -67,7 +67,7 @@ def get_byma(ratios):
     # WTF CEDEARS_LIVE_URL doesn't have a proper TLS cert(?)
     r = url_get(CEDEARS_LIVE_URL, params=CEDEARS_LIVE_PARAMS, verify=False, timeout=30)
     # Parse JSON into DF
-    df = pd.DataFrame(columns=['Ticker', 'ARS_value', 'Ratio', 'ARS_Volume', 'ARS_OrdBuy', 'ARS_OrdSel', 'US_Ticker'])
+    df = pd.DataFrame(columns=['Ticker', 'ARS_value', 'Ratio', 'ARS_Volume', 'ARS_OrdBuy', 'ARS_OrdSel', 'ARS_delta', 'US_Ticker'])
     for x in r.json()["Cotizaciones"]:
         # - skip tickers w/o value
         # - only delayed quotes, for better volume
@@ -85,6 +85,7 @@ def get_byma(ratios):
         volume = x['Volumen_Nominal']
         ars_buy = x['Cantidad_Nominal_Compra']
         ars_sell = x['Cantidad_Nominal_Venta']
+        ars_delta = x['Variacion']
         #logger.info('ticker={} ars_value={}'.format(ticker, ars_value))
         try:
             ratio = ratios.loc[ticker, 'Ratio']
@@ -100,6 +101,7 @@ def get_byma(ratios):
             'ARS_OrdBuy': ars_buy,
             'ARS_OrdSel': ars_sell,
             'ARS_period': period,
+            'ARS_delta': ars_delta,
         }, ignore_index=True)
     # Index the DF by ticker
     df = df.set_index("Ticker")
@@ -118,16 +120,16 @@ def cache_zacks_rank(cache, stock):
     rank = "N/A"
     try:
         r = url_get(url, timeout=30)
+        rank_match = re.search(
+            r'\n\s*([^<]+).+rank_chip.rankrect_1.*rank_chip.rankrect_2',
+            r.text
+        )
     except requests.exceptions.ReadTimeout:
-        pass
-    rank_match = re.search(
-        r'\n\s*([^<]+).+rank_chip.rankrect_1.*rank_chip.rankrect_2',
-        r.text
-    )
+        return
     try:
         rank = rank_match.groups(1)[0]
     except AttributeError:
-        pass
+        return
 
     # Save found rank into cache
     cache[stock] = "{:8}".format(rank.replace("Strong ", "S"))
@@ -254,6 +256,9 @@ def parseargs():
     return parser.parse_args()
 
 def main():
+    pd.set_option('display.max_rows', 500)
+    pd.set_option('display.max_columns', 500)
+    pd.set_option('display.width', 1000)
     args = parseargs()
     logger.info(
         "Choosing CEDEARS with volume >= {:0.2f} quantile"
