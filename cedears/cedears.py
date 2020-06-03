@@ -218,6 +218,7 @@ def get_main_df(args):
     ratios = get_ratios()
     byma_all = get_byma(ratios)
 
+    tickers_to_include = args.tickers.split(',')
     # Choose only stocks with ARS_value > 0 and volume over vol_quantile
     if args.no_filter:
         df = byma_all
@@ -227,7 +228,8 @@ def get_main_df(args):
             (
                 (byma_all.ARS_Volume >= byma_all.ARS_Volume.quantile(args.vol_quantile)) |
                 (byma_all.ARS_OrdBuy >= byma_all.ARS_OrdBuy.quantile(args.vol_quantile)) |
-                (byma_all.ARS_OrdSel >= byma_all.ARS_OrdSel.quantile(args.vol_quantile))
+                (byma_all.ARS_OrdSel >= byma_all.ARS_OrdSel.quantile(args.vol_quantile)) |
+                (byma_all.index.isin(tickers_to_include))
             )
         ]
     df.sort_index(inplace=True)
@@ -236,8 +238,8 @@ def get_main_df(args):
         sys.exit(1)
 
     logger.info(
-        "CEDEARS CCLs: filtered {} tickers for vol_quantile >= {:.2f}"
-        .format(len(df), args.vol_quantile)
+        "CEDEARS CCLs: filtered {} tickers for q >= {:.2f}, incl={}"
+        .format(len(df), args.vol_quantile, str(tickers_to_include))
     )
     # Invoke "main" function (which does async url fetching)
     loop = asyncio.get_event_loop()
@@ -250,9 +252,12 @@ def get_main_df(args):
 
 def parseargs():
     parser = argparse.ArgumentParser(description="CEDEARS CCL tool by jjo")
-    parser.add_argument('vol_quantile', type=float, nargs='?',
-                        default = VOLUME_QUANTILE)
-    parser.add_argument('--no-filter', action="store_true")
+    parser.add_argument('--vol_quantile', type=float, default = VOLUME_QUANTILE,
+                        help="min volume quantile to use, default: {}".format(VOLUME_QUANTILE))
+    parser.add_argument('--no-filter', action="store_true",
+                        help="Get them all(!)")
+    parser.add_argument('--tickers', default="",
+                        help="comma delimited list of stocks to include (regardless of vol_quantile)")
     return parser.parse_args()
 
 def main():
