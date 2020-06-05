@@ -16,8 +16,6 @@ import pandas as pd
 import requests
 import jsonpath_rw as jp
 import json
-import memcache
-import aiohttp
 import httpx
 import httpcore
 from aiocache import cached, Cache
