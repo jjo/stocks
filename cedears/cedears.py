@@ -15,6 +15,11 @@ import numpy as np
 import pandas as pd
 import requests
 import jsonpath_rw as jp
+import json
+import memcache
+import aiohttp
+from aiocache import cached, Cache
+from aiocache.serializers import PickleSerializer
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 logger=logging.getLogger()
@@ -31,22 +36,56 @@ YAHOOFIN_PARAMS = {'modules': 'financialData'}
 
 VOLUME_QUANTILE = 0.75
 
-def url_get(url, **kwargs):
-    session = requests.Session()
-    session.headers.update({'User-Agent': USER_AGENT})
-    r = session.get(url, **kwargs)
-    logger.debug("url={}".format(r.url))
-    return r
+ARGS = None
+CACHE = {"cache": Cache.MEMORY}
 
-def get_ratios():
+def parseargs(argv=sys.argv):
+    parser = argparse.ArgumentParser(description="CEDEARS CCL tool by jjo")
+    parser.add_argument('--vol_quantile', type=float, default = VOLUME_QUANTILE,
+                        help="min volume quantile to use, default: {}".format(VOLUME_QUANTILE))
+    parser.add_argument('--no-filter', action="store_true",
+                        help="Get them all(!)")
+    parser.add_argument('--tickers', default="",
+                        help="comma delimited list of stocks to include (regardless of vol_quantile)")
+    parser.add_argument('--cache', default="memory",
+                        help="comma delimited list of stocks to include (regardless of vol_quantile)")
+    return parser.parse_args()
+
+#if __name__ == '__main__':
+if True:
+    ARGS = parseargs()
+    if ARGS.cache == "memcache":
+        logger.info("Using cache={}".format(ARGS.cache))
+        CACHE={
+            "cache": Cache.MEMCACHED,
+            "port": 11211,
+            "endpoint": "127.0.0.1",
+            "pool_size": 10,
+        }
+
+@cached(ttl=60,
+        **CACHE,
+        serializer=PickleSerializer(),
+        namespace="url")
+async def url_get(url, **kwargs):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, headers={'User-Agent': USER_AGENT}, **kwargs) as r:
+            logger.info("url={}".format(r.url))
+            return await r.text()
+
+@cached(ttl=3600,
+        **CACHE,
+        serializer=PickleSerializer(),
+        namespace="ratios")
+async def get_ratios():
     def _ratio(s):
         ratio_args = s.split(':')
         return float(ratio_args[0]) / float(ratio_args[1])
 
     logger.info("CEDEARS ratios: fetching from {}".format(CEDEARS_RATIOS_URL))
     # Returns list of all tables on page
-    r = url_get(CEDEARS_RATIOS_URL)
-    tables = pd.read_html(r.text)
+    r = await url_get(CEDEARS_RATIOS_URL)
+    tables = pd.read_html(r)
 
     # Single table in page
     table = tables[0]
@@ -59,16 +98,22 @@ def get_ratios():
     # Transform X:Y string ratio to X/Y float
     table['Ratio'] = table['Ratio'].apply(lambda x: _ratio(x))
     table = table.set_index('Ticker', drop = False)
-    logger.info("CEDEARS ratios: got {} entries from {}".format(len(table), r.url))
+    #logger.info("CEDEARS ratios: got {} entries from {}".format(len(table), r.url))
+    logger.info("CEDEARS ratios: got {} entries".format(len(table)))
     return table
 
-def get_byma(ratios):
+@cached(ttl=60,
+        **CACHE,
+        serializer=PickleSerializer(),
+        key="byma",
+        namespace="byma")
+async def get_byma(ratios):
     logger.info("CEDEARS quotes: fetching from {}".format(CEDEARS_LIVE_URL))
     # WTF CEDEARS_LIVE_URL doesn't have a proper TLS cert(?)
-    r = url_get(CEDEARS_LIVE_URL, params=CEDEARS_LIVE_PARAMS, verify=False, timeout=30)
+    r = await url_get(CEDEARS_LIVE_URL, params=CEDEARS_LIVE_PARAMS, verify_ssl=False, timeout=30)
     # Parse JSON into DF
     df = pd.DataFrame(columns=['Ticker', 'ARS_value', 'Ratio', 'ARS_Volume', 'ARS_OrdBuy', 'ARS_OrdSel', 'ARS_delta', 'US_Ticker'])
-    for x in r.json()["Cotizaciones"]:
+    for x in json.loads(r)["Cotizaciones"]:
         # - skip tickers w/o value
         # - only delayed quotes, for better volume
         # - skip tickers w/no Volume
@@ -105,64 +150,62 @@ def get_byma(ratios):
         }, ignore_index=True)
     # Index the DF by ticker
     df = df.set_index("Ticker")
-    logger.info("CEDEARS quotes: got {} entries from {}".format(len(df), r.url))
+    #logger.info("CEDEARS quotes: got {} entries from {}".format(len(df), r.url))
+    logger.info("CEDEARS quotes: got {} entries".format(len(df)))
     if len(df) == 0:
         logger.warning("CEDEARS quotes: ZERO -- Market not yet open ?".format(len(df)))
     return df
 
-CACHE_USD = {}
-CACHE_ZACKS = {}
-
-def cache_zacks_rank(cache, stock):
-    global CACHE_ZACKS
+@cached(ttl=1800,
+        **CACHE,
+        serializer=PickleSerializer(),
+        namespace="zrank")
+async def get_zacks_rank(stock):
 
     url = ZACKS_URL.format(stock)
     rank = "N/A"
     try:
-        r = url_get(url, timeout=30)
+        r = await url_get(url, timeout=30)
         rank_match = re.search(
             r'\n\s*([^<]+).+rank_chip.rankrect_1.*rank_chip.rankrect_2',
-            r.text
+            r
         )
-    except requests.exceptions.ReadTimeout:
-        return
+    except (aiohttp.client_exceptions.ClientOSError,
+            aiohttp.client_exceptions.ServerDisconnectedError,
+            asyncio.exceptions.TimeoutError):
+        return rank
     try:
         rank = rank_match.groups(1)[0]
     except AttributeError:
-        return
+        return rank
 
     # Save found rank into cache
-    cache[stock] = "{:8}".format(rank.replace("Strong ", "S"))
-    logger.debug("stock={:8} rank={:8} from {}".format(stock, rank, r.url))
+    rank = "{:8}".format(rank.replace("Strong ", "S"))
+    logger.debug("stock={:8} rank={:8}".format(stock, rank))
+    return rank
 
-def cache_usd_value(cache, stock):
-    global CACHE_USD
-
+@cached(ttl=60,
+        **CACHE,
+        serializer=PickleSerializer(),
+        namespace="zrank")
+async def get_usd_value(stock):
     url = YAHOOFIN_URL.format(stock)
-    r = url_get(url, params=YAHOOFIN_PARAMS, timeout=30)
+    r = await url_get(url, params=YAHOOFIN_PARAMS, timeout=30)
     # Use jsonpath to traverse it down to the data we want
     jp_exp = jp.parse('$.quoteSummary.result..financialData.currentPrice.raw')
     try:
-        price = jp_exp.find(r.json())[0].value
+        price = jp_exp.find(json.loads(r))[0].value
     except IndexError:
         return
-    if r.status_code != 200:
+    if r == "":
         return
     # Save found price into cache
-    cache[stock] = price
-    logger.debug("stock={:8} price={:0.2f} from {}".format(stock, price, r.url))
+    logger.debug("stock={:8} price={:0.2f}".format(stock, price))
+    return price
 
 # Just a convenient function that's called couple times below
 def get_ccl_val(price_ars, price, ratio):
     return price_ars / price * ratio
-
-# Query CACHE_USD
-def get_usd_value(stock):
-    return CACHE_USD.get(stock)
-
-# Query CACHE_ZACKS
-def get_zacks_rank(stock):
-    return CACHE_ZACKS.get(stock, "N/A")
 
 def df_loc1(df, index, col):
     return df.loc[df.index == index, col].head(1).iloc[0]
@@ -170,27 +213,30 @@ def df_loc1(df, index, col):
 async def fetch(df):
     # Stocks list is DF index
     stocks = set(df.index.values.tolist())
+    logger.info("jjo: stocks={}".format(stocks))
     # Async stanza, to concurrently fetch stocks' price and zacks rank
-    loop = asyncio.get_event_loop()
     futures = []
+    # Warm caches
     for stock in stocks:
         # We may have several entries for (AR)stock, just choose one:
         us_stock = df_loc1(df, stock, 'US_Ticker')
         assert type(us_stock) == str, "stock={} returned type(us_stock)={}".format(
             stock, type(us_stock)
         )
-        futures.append(loop.run_in_executor(None, cache_usd_value, CACHE_USD, us_stock))
-        futures.append(loop.run_in_executor(None, cache_zacks_rank, CACHE_ZACKS, us_stock))
+        futures.append(get_usd_value(us_stock))
+        futures.append(get_zacks_rank(us_stock))
 
     # Called functions already save data into caches, they don't return values
     for _ in await asyncio.gather(*futures):
         pass
+    logger.info("jjo: DONE stocks={}".format(stocks))
 
     # Add new columns to dataframe with obtained CCL value (ARS/USD ratio
     # for the ticker), and Zacks rank
     for stock in stocks:
-        price = get_usd_value(stock)
-        rank = get_zacks_rank(stock)
+        us_stock = df_loc1(df, stock, 'US_Ticker')
+        price = await get_usd_value(us_stock)
+        rank = await get_zacks_rank(us_stock)
         if (price == None or price == 0.0 or rank == None):
             df.drop(stock, inplace=True)
             continue
@@ -211,12 +257,12 @@ async def fetch(df):
     df.sort_values(by=['CCL_ratio'], inplace=True)
     return df
 
-def get_main_df(args):
+async def get_main_df(args):
     urllib3.disable_warnings()
 
     # This 1st part is synchronous, as it's required to build the final dataframe
-    ratios = get_ratios()
-    byma_all = get_byma(ratios)
+    ratios = await get_ratios()
+    byma_all = await get_byma(ratios)
 
     tickers_to_include = args.tickers.split(',')
     # Choose only stocks with ARS_value > 0 and volume over vol_quantile
@@ -241,35 +287,29 @@ def get_main_df(args):
         "CEDEARS CCLs: filtered {} tickers for q >= {:.2f}, incl={}"
         .format(len(df), args.vol_quantile, str(tickers_to_include))
     )
-    # Invoke "main" function (which does async url fetching)
-    loop = asyncio.get_event_loop()
-    df = loop.run_until_complete(fetch(df))
 
-    df.round({'CCL_ratio': 2})
+    df = await(fetch(df))
     # Sort DF columns
+    df.round({'CCL_ratio': 2})
     df = df.reindex(sorted(df.columns), axis=1)
     return df
 
-def parseargs():
-    parser = argparse.ArgumentParser(description="CEDEARS CCL tool by jjo")
-    parser.add_argument('--vol_quantile', type=float, default = VOLUME_QUANTILE,
-                        help="min volume quantile to use, default: {}".format(VOLUME_QUANTILE))
-    parser.add_argument('--no-filter', action="store_true",
-                        help="Get them all(!)")
-    parser.add_argument('--tickers', default="",
-                        help="comma delimited list of stocks to include (regardless of vol_quantile)")
-    return parser.parse_args()
 
 def main():
     pd.set_option('display.max_rows', 500)
     pd.set_option('display.max_columns', 500)
     pd.set_option('display.width', 1000)
     args = parseargs()
+    global CACHE
     logger.info(
         "Choosing CEDEARS with volume >= {:0.2f} quantile"
         .format(args.vol_quantile)
     )
-    return get_main_df(args)
+    # Invoke "main" function (which does async url fetching)
+    loop = asyncio.get_event_loop()
+    #df = loop.run_until_complete(fetch(df))
+    #return get_main_df(args)
+    return loop.run_until_complete(get_main_df(args))
 
 if __name__ == '__main__':
     df = main()
