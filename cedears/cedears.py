@@ -18,6 +18,8 @@ import jsonpath_rw as jp
 import json
 import memcache
 import aiohttp
+import httpx
+import httpcore
 from aiocache import cached, Cache
 from aiocache.serializers import PickleSerializer
 
@@ -68,10 +70,10 @@ if True:
         serializer=PickleSerializer(),
         namespace="url")
 async def url_get(url, **kwargs):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, headers={'User-Agent': USER_AGENT}, **kwargs) as r:
-            logger.info("url={}".format(r.url))
-            return await r.text()
+    async with httpx.AsyncClient(verify=False) as client:
+        r = await client.get(url, headers={'User-Agent': USER_AGENT}, **kwargs)
+        logger.info("url={}".format(r.url))
+        return r.text
 
 @cached(ttl=3600,
         **CACHE,
@@ -110,7 +112,7 @@ async def get_ratios():
 async def get_byma(ratios):
     logger.info("CEDEARS quotes: fetching from {}".format(CEDEARS_LIVE_URL))
     # WTF CEDEARS_LIVE_URL doesn't have a proper TLS cert(?)
-    r = await url_get(CEDEARS_LIVE_URL, params=CEDEARS_LIVE_PARAMS, verify_ssl=False, timeout=30)
+    r = await url_get(CEDEARS_LIVE_URL, params=CEDEARS_LIVE_PARAMS, timeout=30)
     # Parse JSON into DF
     df = pd.DataFrame(columns=['Ticker', 'ARS_value', 'Ratio', 'ARS_Volume', 'ARS_OrdBuy', 'ARS_OrdSel', 'ARS_delta', 'US_Ticker'])
     for x in json.loads(r)["Cotizaciones"]:
@@ -172,7 +174,8 @@ async def get_zacks_rank(stock):
         )
     except (aiohttp.client_exceptions.ClientOSError,
             aiohttp.client_exceptions.ServerDisconnectedError,
-            asyncio.exceptions.TimeoutError):
+            asyncio.exceptions.TimeoutError,
+            httpcore._exceptions.ProtocolError):
         return rank
     try:
         rank = rank_match.groups(1)[0]
@@ -210,7 +213,7 @@ def get_ccl_val(price_ars, price, ratio):
 def df_loc1(df, index, col):
     return df.loc[df.index == index, col].head(1).iloc[0]
 
-async def fetch(df):
+async def warmcache(df):
     # Stocks list is DF index
     stocks = set(df.index.values.tolist())
     logger.info("jjo: stocks={}".format(stocks))
@@ -230,6 +233,12 @@ async def fetch(df):
     for _ in await asyncio.gather(*futures):
         pass
     logger.info("jjo: DONE stocks={}".format(stocks))
+    return
+
+async def fetch(df):
+    # Stocks list is DF index
+    stocks = set(df.index.values.tolist())
+    await warmcache(df)
 
     # Add new columns to dataframe with obtained CCL value (ARS/USD ratio
     # for the ticker), and Zacks rank
