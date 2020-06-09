@@ -12,4 +12,4 @@ FROM python:3.8-slim as runtime-image
 COPY --from=compile-image /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 COPY . /app
-CMD ["/app/cedears.py"]
+ENTRYPOINT ["/app/cedears.py"]
