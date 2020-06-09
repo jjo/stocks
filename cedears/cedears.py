@@ -103,7 +103,7 @@ async def get_ratios():
         'Trading': 'US_Ticker',
     }, inplace=True)
     # Transform X:Y string ratio to X/Y float
-    table['Ratio'] = table['Ratio'].apply(lambda x: _ratio(x))
+    table['Ratio'] = table['Ratio'].apply(_ratio)
     table = table.set_index('Ticker', drop=False)
     LOGGER.info("CEDEARS ratios: got %s entries", len(table))
     return table
@@ -117,7 +117,7 @@ async def get_ratios():
 async def get_byma(ratios):
     'Get BYMA live quotes'
 
-    LOGGER.info("CEDEARS quotes: fetching from {}".format(CEDEARS_LIVE_URL))
+    LOGGER.info("CEDEARS quotes: fetching from %s", CEDEARS_LIVE_URL)
     # WTF CEDEARS_LIVE_URL doesn't have a proper TLS cert(?)
     resp = await url_get(CEDEARS_LIVE_URL, params=CEDEARS_LIVE_PARAMS, timeout=30)
     # Parse JSON into DF
@@ -202,6 +202,7 @@ async def get_zacks_rank(stock):
         serializer=PickleSerializer(),
         namespace="zrank")
 async def get_usd_value(stock):
+    'Get live quote from YAHOO'
     url = YAHOOFIN_URL.format(stock)
     resp = await url_get(url, params=YAHOOFIN_PARAMS, timeout=30)
     # Use jsonpath to traverse it down to the data we want
@@ -230,6 +231,7 @@ def df_loc1(dframe, index, col):
 
 
 async def warmcache(dframe):
+    'Pre-warm cache'
     # Stocks list is DF index
     stocks = set(dframe.index.values.tolist())
     LOGGER.info("jjo: stocks=%s", stocks)
@@ -239,7 +241,9 @@ async def warmcache(dframe):
     for stock in stocks:
         # We may have several entries for (AR)stock, just choose one:
         us_stock = df_loc1(dframe, stock, 'US_Ticker')
-        assert isinstance(us_stock, str), "stock={} returned type(us_stock)={}".format(stock, type(us_stock))
+        assert isinstance(us_stock, str), (
+            "stock={} returned type(us_stock)={}".format(stock, type(us_stock))
+        )
         futures.append(get_usd_value(us_stock))
         futures.append(get_zacks_rank(us_stock))
 
@@ -284,6 +288,10 @@ async def fetch(dframe):
 
 
 async def get_main_df(args):
+    '''
+    Main function: pre-filter some stocks (quantile) and call fetch to actually
+    get them
+    '''
     urllib3.disable_warnings()
 
     # This 1st part is synchronous, as it's required to build the final dataframe
@@ -339,5 +347,5 @@ def main():
 
 
 if __name__ == '__main__':
-    dframe = main()
-    print(dframe)
+    DFRAME = main()
+    print(DFRAME)
