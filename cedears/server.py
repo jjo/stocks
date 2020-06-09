@@ -11,15 +11,16 @@ from quart import Quart, render_template
 sys.argv = [sys.argv[0], '--cache=memcache']
 import cedears
 
-
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 LOGGER = logging.getLogger()
 
 APP = Quart(__name__)
 
+
 async def get_df():
     'Wrapper on cedears module'
     return await cedears.get_main_df(cedears.parseargs())
+
 
 @APP.route("/")
 @cached(ttl=10,
@@ -32,6 +33,7 @@ async def root():
     body = await render_template('root.html', table=dframe.to_html())
     return body
 
+
 async def refresh(params):
     'Background refreshing "task"'
     r_min = params["min"]
@@ -43,9 +45,8 @@ async def refresh(params):
         LOGGER.info("Background refresh: sleeping for %d secs.", period)
         await asyncio.sleep(period)
 
-CRONTAB = [
-    [refresh, {"min": 60, "max": 90}]
-]
+
+CRONTAB = [[refresh, {"min": 60, "max": 90}]]
 
 if __name__ == "__main__":
     LOOP = asyncio.get_event_loop()
