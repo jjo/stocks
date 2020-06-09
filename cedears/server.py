@@ -1,42 +1,46 @@
 #!/usr/bin/env python3
+'Quart server-ization of cedears.py'
 import asyncio
 import sys
 import logging
 import random
-from aiocache import cached, Cache
+from aiocache import cached
 from aiocache.serializers import PickleSerializer
+from quart import Quart, render_template
 
 sys.argv = [sys.argv[0], '--cache=memcache']
 import cedears
 
-from quart import Quart, render_template
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
-logger=logging.getLogger()
+LOGGER = logging.getLogger()
 
-app = Quart(__name__)
+APP = Quart(__name__)
 
 async def get_df():
+    'Wrapper on cedears module'
     return await cedears.get_main_df(cedears.parseargs())
 
-@app.route("/")
+@APP.route("/")
 @cached(ttl=10,
         **cedears.CACHE,
         serializer=PickleSerializer(),
         namespace="site-root")
 async def root():
-    df = await get_df()
-    body = await render_template('root.html', table = df.to_html())
+    'Main / endpoint'
+    dframe = await get_df()
+    body = await render_template('root.html', table=dframe.to_html())
     return body
 
-async def refresh(kv):
-    min = kv["min"]
-    max = kv["max"]
+async def refresh(params):
+    'Background refreshing "task"'
+    r_min = params["min"]
+    r_max = params["max"]
     while True:
-        logger.info("Background refresh: starting ...")
+        LOGGER.info("Background refresh: starting ...")
         await get_df()
-        period = int(min + (max - min) * random.random())
-        logger.info("Background refresh: sleeping for {} secs.".format(period))
+        period = int(r_min + (r_max - r_min) * random.random())
+        LOGGER.info("Background refresh: sleeping for %d secs.", period)
         await asyncio.sleep(period)
 
 CRONTAB = [
@@ -44,9 +48,9 @@ CRONTAB = [
 ]
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
+    LOOP = asyncio.get_event_loop()
     for x in CRONTAB:
         func = x[0]
-        kv = x[1]
-        asyncio.ensure_future(func(kv))
-    app.run(debug=False, loop=loop)
+        r_params = x[1]
+        asyncio.ensure_future(func(r_params))
+    APP.run(debug=False, loop=LOOP)
