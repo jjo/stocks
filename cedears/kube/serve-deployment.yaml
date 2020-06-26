@@ -1,0 +1,31 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: serve
+  name: serve
+  namespace: cedears
+spec:
+  replicas: 1
+  strategy: {}
+  selector:
+    matchLabels:
+      app: serve
+  template:
+    metadata:
+      labels:
+        app: serve
+    spec:
+      containers:
+        - env:
+            - name: MEMCACHE_ENDPOINT
+              value: memcache:11211
+          image: xjjo/cedears
+          imagePullPolicy: Always
+          name: jjo-cedears
+          ports:
+            - containerPort: 5000
+          resources: {}
+      restartPolicy: Always
+status: {}

@@ -135,8 +135,8 @@ async def get_byma(ratios):
                          params=CEDEARS_LIVE_PARAMS)
     # Parse JSON into DF
     dframe = pd.DataFrame(columns=[
-        'Ticker', 'ARS_value', 'Ratio', 'ARS_Vol', 'ARS_OrdBuy', 'ARS_OrdSel',
-        'ARS_delta', 'US_Ticker'
+        'Ticker', 'AR_val', 'Ratio', 'AR_Vol', 'AR_Buy', 'AR_Sel',
+        'AR_chg', 'US_Ticker'
     ])
     for quote in json.loads(resp)["Cotizaciones"]:
         # - skip tickers w/o value
@@ -164,13 +164,13 @@ async def get_byma(ratios):
             {
                 'Ticker': ticker,
                 'US_Ticker': us_ticker,
-                'ARS_value': ars_value,
+                'AR_val': ars_value,
                 'Ratio': round(ratio, 2),
-                'ARS_Vol': volume,
-                'ARS_OrdBuy': ars_buy,
-                'ARS_OrdSel': ars_sell,
-                'ARS_period': period,
-                'ARS_delta': ars_delta,
+                'AR_Vol': volume,
+                'AR_Buy': ars_buy,
+                'AR_Sel': ars_sell,
+                'AR_hrs': period,
+                'AR_chg': ars_delta,
             },
             ignore_index=True)
     # Index the DF by ticker
@@ -274,22 +274,22 @@ async def fetch(dframe):
             dframe.drop(stock, inplace=True)
             continue
 
-        price_ars = df_loc1(dframe, stock, 'ARS_value')
+        price_ars = df_loc1(dframe, stock, 'AR_val')
         ratio = df_loc1(dframe, stock, 'Ratio')
         ccl_val = get_ccl_val(price_ars, price, ratio)
         # Add (column and) cell with computed values
         dframe.loc[stock, 'ZRank'] = rank
         dframe.loc[stock, 'CCL_val'] = round(ccl_val, 2)
-        dframe.loc[stock, 'ARS_tot'] = int(price_ars * ratio)
+        dframe.loc[stock, 'AR_tot'] = int(price_ars * ratio)
         dframe.loc[stock, 'USD_val'] = price
 
     # Use quantile 0.5 as ref value
     ccl_ref = dframe.loc[:, 'CCL_val'].quantile(0.5, interpolation='nearest')
     dframe = dframe.assign(
-        CCL_ratio=lambda x: round((x['CCL_val'] / ccl_ref - 1) * 100, 2)
+        CCL_ref=lambda x: round((x['CCL_val'] / ccl_ref - 1) * 100, 2)
     )
-    # Sort DF by CCL_ratio
-    dframe.sort_values(by=['CCL_ratio'], inplace=True)
+    # Sort DF by CCL_ref
+    dframe.sort_values(by=['CCL_ref'], inplace=True)
     return dframe
 
 
@@ -305,14 +305,14 @@ async def get_main_df(args):
     byma_all = await get_byma(ratios)
 
     tickers_to_include = args.tickers.split(',')
-    # Choose only stocks with ARS_value > 0 and volume over vol_q
+    # Choose only stocks with AR_val > 0 and volume over vol_q
     if args.no_filter:
         dframe = byma_all
     else:
-        dframe = byma_all[(byma_all.ARS_value > 0) & (
-            (byma_all.ARS_Vol >= byma_all.ARS_Vol.quantile(args.vol_q))
-            | (byma_all.ARS_OrdBuy >= byma_all.ARS_OrdBuy.quantile(args.vol_q))
-            | (byma_all.ARS_OrdSel >= byma_all.ARS_OrdSel.quantile(args.vol_q))
+        dframe = byma_all[(byma_all.AR_val > 0) & (
+            (byma_all.AR_Vol >= byma_all.AR_Vol.quantile(args.vol_q))
+            | (byma_all.AR_Buy >= byma_all.AR_Buy.quantile(args.vol_q))
+            | (byma_all.AR_Sel >= byma_all.AR_Sel.quantile(args.vol_q))
             | (byma_all.index.isin(tickers_to_include)))]
     dframe.sort_index(inplace=True)
     if len(dframe) == 0:
@@ -325,7 +325,7 @@ async def get_main_df(args):
 
     dframe = await (fetch(dframe))
     # Sort DF columns
-    dframe.round({'CCL_ratio': 2})
+    dframe.round({'CCL_ref': 2})
     dframe = dframe.reindex(sorted(dframe.columns), axis=1)
     return dframe
 

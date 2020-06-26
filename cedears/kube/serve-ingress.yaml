@@ -1,0 +1,23 @@
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod-http
+  labels:
+    name: serve
+  name: serve
+  namespace: cedears
+spec:
+  rules:
+    - host: cedears.kube.jjo.com.ar
+      http:
+        paths:
+          - backend:
+              serviceName: serve
+              servicePort: 5000
+            path: /
+  tls:
+    - hosts:
+        - cedears.kube.jjo.com.ar
+      secretName: serve-cert

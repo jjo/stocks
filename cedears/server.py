@@ -7,7 +7,7 @@ import random
 import json
 from aiocache import cached
 from aiocache.serializers import PickleSerializer
-from quart import Quart, render_template, jsonify
+from quart import Quart, render_template, jsonify, send_from_directory
 
 sys.argv = [sys.argv[0], '--cache=memcache', '--vol-q=0.5']
 import cedears
@@ -23,6 +23,10 @@ async def get_df():
     'Wrapper on cedears module'
     return await cedears.get_main_df(cedears.parseargs())
 
+@APP.route('/static/<path:path>')
+async def send_static(path):
+    'serve static content'
+    return await send_from_directory('static', path)
 
 @APP.route("/table")
 @cached(ttl=30,
