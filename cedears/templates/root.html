@@ -1,6 +1,16 @@
+<html>
 <head>
+<!--
 <meta http-equiv="refresh" content="60" >
+-->
+<script type="text/javascript" src="https://code.jquery.com/jquery-3.5.1.js"></script>
+
+<!-- with Buttons and other features, from https://datatables.net/download/ -->
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/dt-1.10.21/b-1.6.2/b-colvis-1.6.2/b-html5-1.6.2/cr-1.5.2/fc-3.3.1/fh-3.1.7/kt-2.5.2/r-2.2.5/sl-1.3.1/datatables.min.css"/>
+<script type="text/javascript" src="https://cdn.datatables.net/v/dt/dt-1.10.21/b-1.6.2/b-colvis-1.6.2/b-html5-1.6.2/cr-1.5.2/fc-3.3.1/fh-3.1.7/kt-2.5.2/r-2.2.5/sl-1.3.1/datatables.min.js"></script>
+
 <style>
+/* some personal style */
 .dataframe {
     border: solid 1px #DDEEEE;
     border-collapse: collapse;
@@ -21,26 +31,82 @@
     padding: 10px;
     text-shadow: 1px 1px 1px #fff;
 }
+/* works together with below hover */
+td.highlight {
+    background-color: whitesmoke !important;
+}
 </style>
 </head>
-<html>
+
 <body>
-<input type="text" id="search" placeholder="Type to search">
 {{ table | safe }}
-
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js">
-</script>
 <script>
-var $rows = $('.dataframe tbody tr');
-$('#search').keyup(function() {
-    var val = $.trim($(this).val()).replace(/ +/g, ' ').toLowerCase();
+$(document).ready( function () {
+  getDT();
+} );
 
-    $rows.show().filter(function() {
-        var text = $(this).text().replace(/\s+/g, ' ').toLowerCase();
-        return !~text.indexOf(val);
-    }).hide();
-});
+function getDT() {
+  // THE datatable
+  var table = $('#dataframe').DataTable({
+    ajax: {
+      url: "/table",
+      dataSrc: 'data',
+    },
+    // sort by `order_idx` column
+    order: [[ {{ order_idx }}, "asc" ]],
+    processing: true,
+    pageLength: 50,
+    dom: 'Bfrtip',
+    // 3 buttons: reload, copy, copy current page
+    buttons: [
+      {
+        text: 'Reload',
+        action: function ( e, dt, node, config ) {
+          dt.ajax.reload();
+        }
+      },
+      'copy',
+      {
+        extend: 'copy',
+        text: 'Copy current page',
+        exportOptions: {
+          modifier: {
+            page: 'current'
+          }
+        }
+      },
+    ],
+    // lock header at top
+    fixedHeader: true,
+    // lock left column
+    fixedColumns: {
+      leftColumns: 1
+    },
+    // allow natural rows selector (useful for further `copy`)
+    select: true,
+  });
+
+  // don't raise modal window on error (will go to console)
+  $.fn.dataTable.ext.errMode = 'throw';
+
+  // auto table reload
+  setInterval( function () {
+    // user paging is not reset on reload
+    table.ajax.reload( null, false );
+  }, 60000 );
+
+  // row + col highlighting on hover
+  $('#dataframe tbody')
+    .on( 'mouseenter', 'td', function () {
+      var colIdx = table.cell(this).index().column;
+
+      $( table.cells().nodes() ).removeClass( 'highlight' );
+      $( table.column( colIdx ).nodes() ).addClass( 'highlight' );
+    } );
+}
 </script>
-
 </body>
 </html>
+<!--
+  vim: et si sw=2 ts=2
+-->

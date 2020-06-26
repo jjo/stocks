@@ -1,12 +1,13 @@
+'tests'
 import argparse
 import os
 import unittest
-import cedears
 import urllib
-import mock
 import json
 import sys
 import re
+import mock
+import cedears
 
 CEDEARS_RATIOS_FILE = "CEDEARS-SHARES.html"
 CEDEARS_LIVE_FILE = "CEDEARS-quotes.json"
@@ -16,17 +17,18 @@ URL_FILE_RE = {
 }
 
 def local_url_to_file(url):
+    '...'
     url_to_file = {
         cedears.CEDEARS_RATIOS_URL: CEDEARS_RATIOS_FILE,
         cedears.CEDEARS_LIVE_URL: CEDEARS_LIVE_FILE,
     }
     file_url = url_to_file.get(url)
-    if file_url == None:
-        for (k, v) in URL_FILE_RE.items():
-            m = re.match(k, bytes(url, encoding="utf-8"))
-            if m:
-                stock = m.groups(1)[0].decode("utf-8")
-                file_url = v.format(stock)
+    if file_url is None:
+        for (k, value) in URL_FILE_RE.items():
+            match = re.match(k, bytes(url, encoding="utf-8"))
+            if match:
+                stock = match.groups(1)[0].decode("utf-8")
+                file_url = value.format(stock)
 
     return 'file://{}/testdata/{}'.format(
         os.getcwd(), file_url

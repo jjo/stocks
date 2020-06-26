@@ -1,0 +1,11 @@
+--- lib/python3.8/site-packages/quart/asgi.py.orig	2020-06-25 12:39:57.000000000 -0300
++++ lib/python3.8/site-packages/quart/asgi.py	2020-06-25 12:40:05.328840067 -0300
+@@ -76,6 +76,8 @@
+         else:
+             timeout = self.app.config["RESPONSE_TIMEOUT"]
+         try:
++            if type(timeout) != "float":
++                timeout = 60.0
+             await asyncio.wait_for(self._send_response(send, response), timeout=timeout)
+         except asyncio.TimeoutError:
+             pass

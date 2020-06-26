@@ -1,0 +1,23 @@
+---
+version: "3.3"
+services:
+  memcache:
+    container_name: jjo-memcache
+    image: memcached
+    expose:
+      - 11211
+    user: "1001:65534"
+    read_only: true
+  serve:
+    image: xjjo/cedears
+    container_name: jjo-cedears
+    expose:
+      - 5000
+    ports:
+      - 5000:5000
+    environment:
+      - MEMCACHE_ENDPOINT=memcache:11211
+    depends_on:
+      - memcache
+    user: "1001:65534"
+    read_only: true

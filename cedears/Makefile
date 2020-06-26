@@ -10,8 +10,14 @@ build:
 	docker build -t $(IMAGE) .
 push: build
 	docker push $(IMAGE)
-run:
-	docker run -u 1000 -it $(IMAGE)
+run: compose-up logs
+
+compose-up:
+	docker-compose up -d
+compose-down:
+	docker-compose down
+logs:
+	docker logs -f jjo-cedears
 test:
 	nose2-3 -C
 
@@ -26,4 +32,4 @@ testdata-refresh:
 	$(CURL) -so testdata/zacks-BBD.html https://www.zacks.com/stock/quote/BBD
 	$(CURL) -so testdata/zacks-XOM.html https://www.zacks.com/stock/quote/XOM
 
-.PHONY: all build push run test testdata-refres
+.PHONY: all build push run compose-% test testdata-refres

@@ -7,9 +7,10 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY . /app
+RUN patch -d /opt/venv -p0 -i /app/quart-asgi.diff
 
 FROM python:3.8-slim as runtime-image
 COPY --from=compile-image /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 COPY . /app
-ENTRYPOINT ["/app/cedears.py"]
+ENTRYPOINT ["/app/server.py"]
