@@ -23,6 +23,11 @@ async def get_df():
     'Wrapper on cedears module'
     return await cedears.get_main_df(cedears.parseargs())
 
+@APP.route('/favicon.ico')
+async def send_favicon():
+    'serve favicon'
+    return await send_from_directory('static', 'favicon.ico')
+
 @APP.route('/static/<path:path>')
 async def send_static(path):
     'serve static content'
