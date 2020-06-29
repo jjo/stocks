@@ -9,7 +9,7 @@ from aiocache import cached
 from aiocache.serializers import PickleSerializer
 from quart import Quart, render_template, jsonify, send_from_directory
 
-sys.argv = [sys.argv[0], '--cache=memcache', '--vol-q=0.5']
+sys.argv = [sys.argv[0], '--cache=memcache', '--vol-q=0.25']
 import cedears
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)

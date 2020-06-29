@@ -144,7 +144,6 @@ async def get_byma(ratios):
         # - skip tickers w/no Volume
         # - only ARS tickers
         if (quote['Ultimo'] == 0
-                or quote['Vencimiento'] not in ("48hs", "24hs")
                 or quote['Tipo_Liquidacion'] != "Pesos"):
             continue
         ticker = quote['Simbolo']

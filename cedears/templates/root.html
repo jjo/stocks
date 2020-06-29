@@ -1,5 +1,6 @@
 <html>
 <head>
+  <title>CCL_relativos</title>
 <script type="text/javascript" src="https://code.jquery.com/jquery-3.5.1.js"></script>
 <!-- with Buttons and other features, from https://datatables.net/download/ -->
 <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/dt-1.10.21/b-1.6.2/b-colvis-1.6.2/b-html5-1.6.2/cr-1.5.2/fc-3.3.1/fh-3.1.7/kt-2.5.2/r-2.2.5/sl-1.3.1/datatables.min.css">
@@ -17,14 +18,14 @@
     background-color: #DDEFEF;
     border: solid 1px #DDEEEE;
     color: #336B6B;
-    padding: 2px;
+    padding: 5px;
     text-align: left;
     text-shadow: 1px 1px 1px #fff;
 }
 .dataframe tbody td {
     border: solid 1px #DDEEEE;
     color: #333;
-    padding: 2px;
+    padding: 5px;
     text-shadow: 1px 1px 1px #fff;
 }
 /* works together with below hover */
@@ -35,6 +36,17 @@ td.highlight {
 </head>
 
 <body>
+<h1>CCL relativos</h1>
+<p>
+<ul>
+  <li><code>CCL_ref</code>: valor relativo de cada CCL respecto del que está a la mitad (mediana),<br>
+    tomando solamente los tickers cuyo volumen es "relevante" (<code>AR_Vol</code>) (mayor que el 25% quantile)
+  <li><code>AR_val</code>: de <a href="https://www.byma.com.ar/wp-admin/admin-ajax.php?action=get_panel&panel_id=5">BYMA</a>
+  <li><code>USD_val</code>: de <a href="https://finance.yahoo.com/">Yahoo finance</a>
+  <li><code>ZRank</code>: de <a href=https://www.zacks.com/>https://www.zacks.com</a>
+  <li>Auto-recarga cada 1min
+</ul>
+<p>
 {{ table | safe }}
 <script>
 $(document).ready( function () {
