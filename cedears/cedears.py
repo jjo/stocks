@@ -131,20 +131,20 @@ async def get_byma(ratios):
 
     LOGGER.info("CEDEARS quotes: fetching from %s", CEDEARS_LIVE_URL)
     # WTF CEDEARS_LIVE_URL doesn't have a proper TLS cert(?)
-    resp = await url_get(CEDEARS_LIVE_URL, timeout=30,
+    resp = await url_get(CEDEARS_LIVE_URL,
+                         timeout=30,
                          params=CEDEARS_LIVE_PARAMS)
     # Parse JSON into DF
     dframe = pd.DataFrame(columns=[
-        'Ticker', 'AR_val', 'Ratio', 'AR_Vol', 'AR_Buy', 'AR_Sel',
-        'AR_chg', 'US_Ticker'
+        'Ticker', 'AR_val', 'Ratio', 'AR_Vol', 'AR_Buy', 'AR_Sel', 'AR_chg',
+        'US_Ticker'
     ])
     for quote in json.loads(resp)["Cotizaciones"]:
         # - skip tickers w/o value
         # - only delayed quotes, for better volume
         # - skip tickers w/no Volume
         # - only ARS tickers
-        if (quote['Ultimo'] == 0
-                or quote['Tipo_Liquidacion'] != "Pesos"):
+        if (quote['Ultimo'] == 0 or quote['Tipo_Liquidacion'] != "Pesos"):
             continue
         ticker = quote['Simbolo']
         ars_value = quote['Ultimo']
@@ -191,8 +191,7 @@ async def get_zacks_rank(stock):
         rank_match = re.search(
             r'\n\s*([^<]+).+rank_chip.rankrect_1.*rank_chip.rankrect_2', resp)
     except (httpcore._exceptions.ProtocolError,
-            httpcore._exceptions.ReadTimeout,
-            asyncio.exceptions.TimeoutError):
+            httpcore._exceptions.ReadTimeout, asyncio.exceptions.TimeoutError):
         return rank
     try:
         rank = rank_match.groups(1)[0]
@@ -226,7 +225,7 @@ async def get_usd_value(stock):
 # Just a convenient function that's called couple times below
 
 
-def get_ccl_val(price_ars, price, ratio):
+def ccl_val(price_ars, price, ratio):
     'just a math wrapper for the CCL calculation'
     return price_ars / price * ratio
 
@@ -273,22 +272,20 @@ async def fetch(dframe):
             dframe.drop(stock, inplace=True)
             continue
 
-        price_ars = df_loc1(dframe, stock, 'AR_val')
-        ratio = df_loc1(dframe, stock, 'Ratio')
-        ccl_val = get_ccl_val(price_ars, price, ratio)
         # Add (column and) cell with computed values
         dframe.loc[stock, 'ZRank'] = rank
-        dframe.loc[stock, 'CCL_val'] = round(ccl_val, 2)
-        dframe.loc[stock, 'AR_tot'] = int(price_ars * ratio)
         dframe.loc[stock, 'USD_val'] = price
 
-    # Use quantile 0.5 as ref value
+    dframe['AR_tot'] = dframe.apply(lambda row: row.AR_val * row.Ratio, axis=1)
+    dframe['CCL_val'] = dframe.apply(
+        lambda row: round(ccl_val(row.AR_val, row.USD_val, row.Ratio), 2),
+        axis=1)
+    # Use quantile 0.5 as reference value
     ccl_ref = dframe.loc[:, 'CCL_val'].quantile(0.5, interpolation='nearest')
     dframe = dframe.assign(
-        CCL_ref=lambda x: round((x['CCL_val'] / ccl_ref - 1) * 100, 2)
-    )
-    # Sort DF by CCL_ref
-    dframe.sort_values(by=['CCL_ref'], inplace=True)
+        CCL_pct=lambda x: round((x['CCL_val'] / ccl_ref - 1) * 100, 2))
+    # Sort DF by CCL_pct
+    dframe.sort_values(by=['CCL_pct'], inplace=True)
     return dframe
 
 
@@ -324,7 +321,7 @@ async def get_main_df(args):
 
     dframe = await (fetch(dframe))
     # Sort DF columns
-    dframe.round({'CCL_ref': 2})
+    dframe.round({'CCL_pct': 2})
     dframe = dframe.reindex(sorted(dframe.columns), axis=1)
     return dframe
 
