@@ -140,14 +140,20 @@ async def get_byma(ratios):
         'US_Ticker'
     ])
     for quote in json.loads(resp)["Cotizaciones"]:
-        # - skip tickers w/o value
-        # - only delayed quotes, for better volume
-        # - skip tickers w/no Volume
         # - only ARS tickers
-        if (quote['Ultimo'] == 0 or quote['Tipo_Liquidacion'] != "Pesos"):
+        if quote['Tipo_Liquidacion'] != "Pesos":
             continue
-        ticker = quote['Simbolo']
+        # - if market is not yet open (between 10:00am - 11:30am), grab value
+        #   from latest (Compra+Venta)/2
+        # - XXX: not meaningful, need to really wait for market open
+        #if quote['Ultimo'] != 0:
+        #    ars_value = quote['Ultimo']
+        #elif (quote['Precio_Compra'] != 0 and quote['Precio_Venta'] != 0):
+        #    ars_value = (quote['Precio_Compra'] + quote['Precio_Venta'])/2
+        #else:
+        #    continue
         ars_value = quote['Ultimo']
+        ticker = quote['Simbolo']
         period = quote['Vencimiento']
         volume = quote['Volumen_Nominal']
         ars_buy = quote['Cantidad_Nominal_Compra']
@@ -305,7 +311,8 @@ async def get_main_df(args):
     if args.no_filter:
         dframe = byma_all
     else:
-        dframe = byma_all[(byma_all.AR_val > 0) & (
+        #dframe = byma_all[(byma_all.AR_val > 0) & (
+        dframe = byma_all[(
             (byma_all.AR_Vol >= byma_all.AR_Vol.quantile(args.vol_q))
             | (byma_all.AR_Buy >= byma_all.AR_Buy.quantile(args.vol_q))
             | (byma_all.AR_Sel >= byma_all.AR_Sel.quantile(args.vol_q))

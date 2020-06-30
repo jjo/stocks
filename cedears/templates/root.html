@@ -55,6 +55,7 @@ td.highlight {
       <div class="card-body">
         <ul>
           <li>Se muestran sólo los tickers cuyo volumen es "relevante" (<code>AR_Vol</code> mayor que el 25% quantile)
+          <li>Entre 10:00am y 11:30am hora argentina `AR_val` y otros aparecen en *cero* (feed de BYMA), hasta que abra el mercado local
           <li><code>CCL_pct</code>: valor relativo PORCENTUAL de cada CCL respecto del que está a la mitad del rango (mediana)
           <li><code>AR_val</code>: de <a href="https://www.byma.com.ar/wp-admin/admin-ajax.php?action=get_panel&panel_id=5">BYMA</a>
           <li><code>USD_val</code>: de <a href="https://finance.yahoo.com/">Yahoo finance</a>
