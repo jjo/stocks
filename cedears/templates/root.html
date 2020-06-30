@@ -35,6 +35,14 @@
 td.highlight {
     background-color: whitesmoke !important;
 }
+.search {
+  color: red;
+  margin: 5px;
+  cursor: pointer;
+}
+.search:hover {
+  background: yellow;
+}
 </style>
 </head>
 
@@ -63,12 +71,12 @@ td.highlight {
           <li>Auto-recarga cada 1min
           <li>Ejemplos de uso del campo "Search:"
             <ol>
-              <li><code>buy</code> -- para encontrar oportunidades de compra con CCL "bajo" (relativo al resto)
-              <li><code>sell</code> -- para encontrar oportunidades de venta con CCL "alto" (relativo al resto)
-              <li><code>cdo</code> -- para encontrar oportunidades de compra/venta de contado
-              <li><code>cdo.*buy</code> -- 1 y 3
-              <li><code>cdo.*sell</code> -- 2 y 3
-              <li><code>fb|aapl|amzn|nflx|goog|msft</code> -- muestra estas 5 acciones (aka "FAANG" + M$)
+              <li><div id="search_buy" class="search"><code>buy</code> -- para encontrar oportunidades de compra con CCL "bajo" (relativo al resto)</div>
+              <li><div id="search_sell" class="search"><code>sell</code> -- para encontrar oportunidades de venta con CCL "alto" (relativo al resto)</div>
+              <li><div id="search_cdo" class="search"><code>cdo</code> -- para encontrar oportunidades de compra/venta de contado</div>
+              <li><div id="search_cdo_buy" class="search"><code>cdo.*buy</code> -- 1 y 3</div>
+              <li><div id="search_cdo_sell" class="search"><code>cdo.*sell</code> -- 2 y 3</div>
+              <li><div id="search_faang" class="search"><code>fb|aapl|amzn|nflx|goog|msft</code> -- muestra estas 5 acciones (aka "FAANG" + M$)</div>
             </ol>
         </ul>
       </div>
@@ -78,13 +86,14 @@ td.highlight {
 <p>
 {{ table | safe }}
 <script>
+// THE datatable
+var table;
 $(document).ready( function () {
   getDT();
 } );
 
 function getDT() {
-  // THE datatable
-  var table = $('#dataframe').DataTable({
+  table = $('#dataframe').DataTable({
     ajax: {
       url: "/table",
       dataSrc: 'data',
@@ -126,6 +135,24 @@ function getDT() {
     select: true,
   });
 
+  $("#search_buy").click(function() {
+    table.search("buy").draw();
+  });
+  $("#search_sell").click(function() {
+    table.search("sell").draw();
+  });
+  $("#search_cdo").click(function() {
+    table.search("cdo").draw();
+  });
+  $("#search_cdo_buy").click(function() {
+    table.search("cdo.*buy").draw();
+  });
+  $("#search_cdo_sell").click(function() {
+    table.search("cdo.*sell").draw();
+  });
+  $("#search_faang").click(function() {
+    table.search("fb|aapl|amzn|nflx|goog|msft").draw();
+  });
   // don't raise modal window on error (will go to console)
   $.fn.dataTable.ext.errMode = 'throw';
 

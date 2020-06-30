@@ -311,8 +311,8 @@ async def get_main_df(args):
     if args.no_filter:
         dframe = byma_all
     else:
-        #dframe = byma_all[(byma_all.AR_val > 0) & (
-        dframe = byma_all[(
+        #dframe = byma_all[(
+        dframe = byma_all[(byma_all.AR_val > 0) & (
             (byma_all.AR_Vol >= byma_all.AR_Vol.quantile(args.vol_q))
             | (byma_all.AR_Buy >= byma_all.AR_Buy.quantile(args.vol_q))
             | (byma_all.AR_Sel >= byma_all.AR_Sel.quantile(args.vol_q))
