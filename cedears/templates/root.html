@@ -90,7 +90,7 @@ function getDT() {
       dataSrc: 'data',
     },
     // sort by `order_idx` column
-    order: [[ {{ order_idx }}, "asc" ]],
+    order: [[ {{ order_idx }}, "asc" ], [ 0, "asc" ]],
     processing: true,
     pageLength: 50,
     dom: 'Bfrtip',
