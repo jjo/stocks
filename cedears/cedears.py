@@ -311,16 +311,20 @@ async def get_main_df(args):
     if args.no_filter:
         dframe = byma_all
     else:
-        #dframe = byma_all[(
         dframe = byma_all[(byma_all.AR_val > 0) & (
             (byma_all.AR_Vol >= byma_all.AR_Vol.quantile(args.vol_q))
             | (byma_all.AR_Buy >= byma_all.AR_Buy.quantile(args.vol_q))
             | (byma_all.AR_Sel >= byma_all.AR_Sel.quantile(args.vol_q))
             | (byma_all.index.isin(tickers_to_include)))]
+        if len(dframe) == 0:
+            #LOGGER.fatal("NO stocks grabbed")
+            #sys.exit(1)
+            dframe = byma_all[(
+                (byma_all.AR_Vol >= byma_all.AR_Vol.quantile(args.vol_q))
+                | (byma_all.AR_Buy >= byma_all.AR_Buy.quantile(args.vol_q))
+                | (byma_all.AR_Sel >= byma_all.AR_Sel.quantile(args.vol_q))
+                | (byma_all.index.isin(tickers_to_include)))]
     dframe.sort_index(inplace=True)
-    if len(dframe) == 0:
-        LOGGER.fatal("NO stocks grabbed")
-        sys.exit(1)
 
     LOGGER.info(
         "CEDEARS CCLs: filtered {} tickers for q >= {:.2f}, incl={}".format(
