@@ -109,9 +109,10 @@ async def get_ratios():
     table = tables[0]
     # Translate field names ES -> EN
     table.columns = [col.split(" ")[0] for col in table.columns]
+    LOGGER.info("columns=%s", table.columns)
     table.rename(columns={
-        'Simbolo': 'Ticker',
-        'Trading': 'US_Ticker',
+        'Ticker': 'US_Ticker',
+        'Símbolo': 'Ticker',
     },
                  inplace=True)
     # Transform X:Y string ratio to X/Y float
