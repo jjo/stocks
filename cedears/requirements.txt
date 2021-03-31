@@ -3,7 +3,7 @@ pandas==0.25.3
 requests==2.22.0
 jsonpath_rw==1.4.0
 ujson==3.0.0
-lxml==4.5.0
+lxml==4.6.3
 aiocache[memcached]==0.11.1
 httpx==0.13.3
 Quart==0.12.0
