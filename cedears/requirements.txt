@@ -1,4 +1,4 @@
-urllib3==1.25.8
+urllib3==1.26.5
 pandas==0.25.3
 requests==2.22.0
 jsonpath_rw==1.4.0
